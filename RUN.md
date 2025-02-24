@@ -8,7 +8,7 @@ cover-agent \
   --test-command-dir "." \
   --coverage-type "cobertura" \
   --desired-coverage 99 \
-  --max-iterations 7 \
+  --max-iterations 10 \
   --prompt-path "prompt.json" \
   --additional-instructions "However, do not assert exception messages or any string-based messages in assertions, as these may lead to test failures due to minor variations." \
   --model "gpt-4o-mini"
