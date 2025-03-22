@@ -23,6 +23,8 @@ class UnitTestGenerationAttempt(Base):
     source_file = Column(Text)
     original_test_file = Column(Text)
     processed_test_file = Column(Text)
+    mut_report_html_file = Column(Text)
+    mut_report_yaml_file = Column(Text)
 
 class UnitTestDB:
     def __init__(self, db_connection_string):
@@ -46,6 +48,8 @@ class UnitTestDB:
                 source_file=test_result.get("source_file"),
                 original_test_file=test_result.get("original_test_file"),
                 processed_test_file=test_result.get("processed_test_file"),
+                mut_report_html_file=test_result.get("mut_report_html_file", ""),
+                mut_report_yaml_file=test_result.get("mut_report_yaml_file", "")
             )
             session.add(new_attempt)
             session.commit()
@@ -77,6 +81,8 @@ class UnitTestDB:
                 "source_file": attempt.source_file,
                 "original_test_file": attempt.original_test_file,
                 "processed_test_file": attempt.processed_test_file,
+                "mut_report_html_file": attempt.mut_report_html_file,
+                "mut_report_yaml_file": attempt.mut_report_yaml_file
             }
             for attempt in attempts
         ]

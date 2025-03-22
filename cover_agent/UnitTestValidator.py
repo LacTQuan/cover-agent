@@ -11,9 +11,11 @@ from cover_agent.CustomLogger import CustomLogger
 from cover_agent.FilePreprocessor import FilePreprocessor
 from cover_agent.PromptBuilder import PromptBuilder
 from cover_agent.Runner import Runner
+from cover_agent.MutationTester import MutationTester
 from cover_agent.settings.config_loader import get_settings
 from cover_agent.utils import load_yaml
 
+MUTMUT_TEST_COMMAND = "mutmut run"
 
 class UnitTestValidator:
     def __init__(
@@ -377,6 +379,8 @@ class UnitTestValidator:
             12. Handle any exceptions that occur during the validation process, log the errors, and roll back the test file if necessary.
             13. Log additional details and error messages for failed tests, and optionally, use the Trace class for detailed logging if 'WANDB_API_KEY' is present in the environment variables.
         """
+        mut_report_html_file = ""
+        mut_report_yaml_file = ""
         # Store original content of the test file
         with open(self.test_file_path, "r") as test_file:
             original_content = test_file.read()
@@ -479,6 +483,8 @@ class UnitTestValidator:
                         "source_file": self.source_code,
                         "original_test_file": original_content,
                         "processed_test_file": processed_test,
+                        "mut_report_html_file": "",
+                        "mut_report_yaml_file": "",
                     }
 
                     error_message = self.extract_error_message(fail_details)
@@ -501,8 +507,32 @@ class UnitTestValidator:
                         root_span.log(name="inference")
 
                     return fail_details
+                
+                # Continue running mutation tests if the test passed
+                try:
+                    mutation_tester = MutationTester()
+                    self.logger.info(
+                        f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
+                    )
+                    stdout, stderr, exit_code, time_of_test_command = mutation_tester.run()
 
-                # If test passed, check for coverage increase
+                    # get the prompt for the mutation test results
+                    prompt = mutation_tester.generate_prompt()
+                    
+                    mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
+                    
+                    # clean up the mutants folder
+                    # os.system(f"rm -rf {self.project_root}/{mut_report_html_file.split('.')[0]}/mutants")
+
+                    if exit_code != 0:
+                        self.logger.error(f"Error running mutation tests: {stderr}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error running mutation tests: {e}")
+
+
+
+                # If test passed, check for coverage increase (branch and line coverage)
                 try:
                     new_percentage_covered, new_coverage_percentages = self.post_process_coverage_report(
                         time_of_test_command
@@ -527,6 +557,8 @@ class UnitTestValidator:
                             "source_file": self.source_code,
                             "original_test_file": original_content,
                             "processed_test_file": processed_test,
+                            "mut_report_html_file": mut_report_html_file,
+                            "mut_report_yaml_file": mut_report_yaml_file,
                         }
                         self.failed_test_runs.append(
                             {
@@ -565,6 +597,8 @@ class UnitTestValidator:
                         "source_file": self.source_code,
                         "original_test_file": original_content,
                         "processed_test_file": processed_test,
+                        "mut_report_html_file": mut_report_html_file,
+                        "mut_report_yaml_file": mut_report_yaml_file,
                     }
                     self.failed_test_runs.append(
                         {
@@ -606,6 +640,8 @@ class UnitTestValidator:
                     "source_file": self.source_code,
                     "original_test_file": original_content,
                     "processed_test_file": processed_test,
+                    "mut_report_html_file": mut_report_html_file,
+                    "mut_report_yaml_file": mut_report_yaml_file,
                 }
         except Exception as e:
             self.logger.error(f"Error validating test: {e}")
@@ -620,6 +656,8 @@ class UnitTestValidator:
                 "source_file": self.source_code,
                 "original_test_file": original_content,
                 "processed_test_file": "N/A",
+                "mut_report_html_file": mut_report_html_file,
+                "mut_report_yaml_file": mut_report_yaml_file,
             }
 
     def to_dict(self):

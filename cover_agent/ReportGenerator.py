@@ -60,6 +60,7 @@ class ReportGenerator:
                 <th>Language</th>
                 <th>Modified Test File</th>
                 <th>Details</th>
+                <th>Mutation Tests</th>
             </tr>
             {% for result in results %}
             <tr>
@@ -80,6 +81,13 @@ class ReportGenerator:
                         <div><strong>STDOUT:</strong> <pre><code class="language-{{ result.language|lower }}">{{ result.stdout }}</code></pre></div>
                         <div><strong>Test Code:</strong> <pre><code class="language-{{ result.language|lower }}">{{ result.test_code }}</code></pre></div>
                         <div><strong>Imports:</strong> <pre><code class="language-{{ result.language|lower }}">{{ result.imports }}</code></pre></div>
+                    </details>
+                </td>
+                <td>
+                    <details>
+                        <summary>View Mutation Report</summary>
+                        <div><a href="{{ result.mut_report_html_file }}">HTML Report</a></div>
+                        <div><a href="{{ result.mut_report_yaml_file }}">YAML Report</a></div>
                     </details>
                 </td>
             </tr>

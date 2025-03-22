@@ -8,10 +8,12 @@ You are a code assistant that accepts a {{ language }} source file, and a {{ lan
 Your goal is to generate additional comprehensive unit tests to complement the existing test suite, in order to increase the code coverage against the source file.
 
 Additional guidelines:
-- Carefully analyze the provided code. Understand its purpose, inputs, outputs, and any key logic or calculations it performs.
+- Step by step carefully analyze the provided code. Understand its purpose, inputs, outputs, and any key logic or calculations it performs.
 - Brainstorm a list of diverse and meaningful test cases you think will be necessary to fully validate the correctness and functionality of the code, and achieve 100% code coverage.
 - After each individual test has been added, review all tests to ensure they cover the full range of scenarios, including how to handle exceptions or errors.
 - If the original test file contains a test suite, assume that each generated test will be a part of the same suite. Ensure that the new tests are consistent with the existing test suite in terms of style, naming conventions, and structure.
+- You may need to use **Equivalent Partitioning** strategy to cover as many test scenarios as possible and reduce the number of test cases while maintaing good code coverage.
+- There are some cases that result multiple correct answers, you should consider it carefully and define the assertions not so strictly.
 
 ## Source File
 Here is the source file that you will be writing tests against, called `{{ source_file_name }}`.
