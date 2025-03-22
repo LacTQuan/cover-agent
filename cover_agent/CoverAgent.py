@@ -152,12 +152,12 @@ class CoverAgent:
 
         # Run initial test suite analysis
         self.test_validator.initial_test_suite_analysis()
-        failed_test_runs, language, test_framework, coverage_report = self.test_validator.get_coverage()
-        self.test_gen.build_prompt(failed_test_runs, language, test_framework, coverage_report)
+        failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.test_validator.get_coverage()
+        self.test_gen.build_prompt(failed_test_runs, mutation_test_results, language, test_framework, coverage_report)
 
-        return failed_test_runs, language, test_framework, coverage_report
+        return failed_test_runs, mutation_test_results, language, test_framework, coverage_report
 
-    def run_test_gen(self, failed_test_runs: List, language: str, test_framework: str, coverage_report: str):
+    def run_test_gen(self, failed_test_runs: List, mutation_test_results: str, language: str, test_framework: str, coverage_report: str):
         """
         Run the test generation process.
 
@@ -184,7 +184,7 @@ class CoverAgent:
             self.log_coverage()
 
             # Generate new tests
-            generated_tests_dict = self.test_gen.generate_tests(failed_test_runs, language, test_framework, coverage_report)
+            generated_tests_dict = self.test_gen.generate_tests(failed_test_runs, mutation_test_results, language, test_framework, coverage_report)
 
             # Loop through each new test and validate it
             for generated_test in generated_tests_dict.get("new_tests", []):
@@ -199,7 +199,7 @@ class CoverAgent:
             iteration_count += 1
 
             # Check if the desired coverage has been reached
-            failed_test_runs, language, test_framework, coverage_report = self.test_validator.get_coverage()
+            failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.test_validator.get_coverage()
             if self.test_validator.current_coverage >= (self.test_validator.desired_coverage / 100):
                 break
 
@@ -247,5 +247,5 @@ class CoverAgent:
         self.logger.info(f"Desired Coverage: {self.test_validator.desired_coverage}%")
 
     def run(self):
-        failed_test_runs, language, test_framework, coverage_report = self.init()
-        self.run_test_gen(failed_test_runs, language, test_framework, coverage_report)
+        failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.init()
+        self.run_test_gen(failed_test_runs, mutation_test_results, language, test_framework, coverage_report)

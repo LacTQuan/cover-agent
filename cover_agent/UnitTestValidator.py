@@ -1,4 +1,5 @@
 from wandb.sdk.data_types.trace_tree import Trace
+import traceback
 import datetime
 import json
 import logging
@@ -99,6 +100,7 @@ class UnitTestValidator:
         # States to maintain within this class
         self.preprocessor = FilePreprocessor(self.test_file_path)
         self.failed_test_runs = []
+        self.mutation_test_results = ""
         self.total_input_token_count = 0
         self.total_output_token_count = 0
         self.testing_framework = "Unknown"
@@ -126,7 +128,7 @@ class UnitTestValidator:
         """
         # Run coverage and build the prompt
         self.run_coverage()
-        return self.failed_test_runs, self.language, self.testing_framework, self.code_coverage_report
+        return self.failed_test_runs, self.mutation_test_results, self.language, self.testing_framework, self.code_coverage_report
     
     def get_code_language(self, source_file_path: str) -> str:
         """
@@ -183,6 +185,7 @@ class UnitTestValidator:
             included_files=self.included_files,
             additional_instructions=self.additional_instructions,
             failed_test_runs="", # see if this can be None
+            mutation_test_results="", # see if this can be None
             language=self.language,
             testing_framework=self.testing_framework,
             project_root=self.project_root,
@@ -514,10 +517,10 @@ class UnitTestValidator:
                     self.logger.info(
                         f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
                     )
-                    stdout, stderr, exit_code, time_of_test_command = mutation_tester.run()
+                    _, stderr, exit_code, _ = mutation_tester.run()
 
                     # get the prompt for the mutation test results
-                    prompt = mutation_tester.generate_prompt()
+                    self.mutation_test_results = mutation_tester.generate_prompt()
                     
                     mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
                     
@@ -529,6 +532,7 @@ class UnitTestValidator:
                     
                 except Exception as e:
                     self.logger.error(f"Error running mutation tests: {e}")
+                    self.logger.error(traceback.format_exc())
 
 
 

@@ -1,4 +1,5 @@
 from cover_agent.Runner import Runner
+from cover_agent.utils import load_yaml
 import yaml
 
 
@@ -30,7 +31,7 @@ class MutationTester:
     self.src_dir = src_dir
     self.test_dir = test_dir
     self.project_root = project_root
-    self.run_command = f"{self.test_command} --target {self.src_dir} --unit-test {self.test_dir} -m --runner pytest --report {self.report_yaml_file} --report-html {self.report_html_file}"
+    self.run_command = f"{self.test_command} --target {self.src_dir} --unit-test {self.test_dir} -m --runner pytest --report {self.report_yaml_file} --report-html {self.report_html_file} --percentage 10"
     
     
   MUTATION_OPERATOR_MAP = {
@@ -72,26 +73,52 @@ class MutationTester:
     )
 
     return stdout, stderr, exit_code, time_of_test_command
+
+  def python_module_constructor(loader, node):
+    # Define how you want to handle the tag here
+    value = loader.construct_scalar(node)
+    # You could, for example, return a string or some object
+    return f"Loaded Python module: {value}"
+
+  yaml.add_constructor(
+      u'tag:yaml.org,2002:python/module:app',
+      python_module_constructor,
+      Loader=yaml.SafeLoader
+  )
   
   def load_report(self):
-    with open(self.report_yaml_file, "r") as f:
-        data = yaml.load(f, Loader=yaml.UnsafeLoader)
-    self.data = data
+    retries = 2
+    print(f"Reading {self.report_yaml_file}...")
+    for attempt in range(retries + 1):
+      try:
+        with open(self.report_yaml_file, "r") as f:
+          data = yaml.safe_load(f)
+          print(f"Data loaded from {self.report_yaml_file}, length: {len(data)}")
+          return data
+      except Exception as e:
+        if attempt < retries:
+          print(f"Attempt to read {self.report_yaml_file} the {attempt + 1} times failed: {e}. Retrying...")
+        else:
+          print(f"Attempt to read {self.report_yaml_file} the {attempt + 1} times failed: {e}. No more retries.")
+          raise
   
   def generate_prompt(self) -> str:
-    self.load_report()
-    if not self.data:
+    yaml_data = self.load_report()
+    # add a delay to allow the file to be read
+    print(f"Data loaded, size: {len(yaml_data)}")
+    
+    if not yaml_data:
         raise ValueError("No data loaded. Call load_report() first.")
 
     # 1. Mutation Score
-    coverage_data = self.data.get("coverage", {})
+    coverage_data = yaml_data.get("coverage", {})
     all_nodes = coverage_data.get("all_nodes", 0)
     covered_nodes = coverage_data.get("covered_nodes", 0)
     # This 'mutation_score' is the % from the top-level
-    mutation_score = self.data.get("mutation_score", 0)
+    mutation_score = yaml_data.get("mutation_score", 0)
 
     # 2. Mutations
-    mutation_list = self.data.get("mutations", [])
+    mutation_list = yaml_data.get("mutations", [])
     survived_mutants = []
 
     for mutation_item in mutation_list:
@@ -124,3 +151,4 @@ class MutationTester:
     prompt_lines.append("Focus on the lines and operators that survived. For each, we need a test scenario that fails if that mutation occurs.")
 
     return "\n".join(prompt_lines)
+

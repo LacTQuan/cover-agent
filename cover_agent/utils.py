@@ -30,7 +30,7 @@ def extract_yaml_content(response_text: str) -> str:
     # If no ```yaml``` markers, assume whole text is YAML (but still clean up)
     return response_text.strip()
 
-def load_yaml(response_text: str, keys_fix_yaml: List[str] = []) -> dict:
+def load_yaml(response_text: str, keys_fix_yaml: List[str] = [], is_markdown: bool = True) -> dict:
     """
     Load and parse YAML data from a given response text.
 
@@ -47,7 +47,8 @@ def load_yaml(response_text: str, keys_fix_yaml: List[str] = []) -> dict:
         load_yaml(response_text, keys_fix_yaml=['key1', 'key2'])
 
     """
-    response_text = extract_yaml_content(response_text)
+    if is_markdown:
+        response_text = extract_yaml_content(response_text)
     try:
         data = yaml.safe_load(response_text)
     except Exception as e:

@@ -51,6 +51,13 @@ If the current tests are part of a class and contain a 'self' input, than the ge
 
 {% endif %}
 
+{%- if mutation_test_results |trim  %}
+
+
+{{ mutation_test_results |trim }}
+
+{% endif %}
+
 {%- if additional_instructions_text|trim  %}
 
 

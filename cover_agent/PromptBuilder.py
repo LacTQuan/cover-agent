@@ -43,6 +43,7 @@ class PromptBuilder:
         included_files: str = "",
         additional_instructions: str = "",
         failed_test_runs: str = "",
+        mutation_test_results: str = "",
         language: str = "python",
         testing_framework: str = "NOT KNOWN",
         project_root: str = "",
@@ -107,6 +108,8 @@ class PromptBuilder:
             if failed_test_runs
             else ""
         )
+        
+        self.mutation_test_results = mutation_test_results
 
         self.stdout_from_run = ""
         self.stderr_from_run = ""
@@ -139,6 +142,7 @@ class PromptBuilder:
             "code_coverage_report": self.code_coverage_report,
             "additional_includes_section": self.included_files,
             "failed_tests_section": self.failed_test_runs,
+            "mutation_test_results": self.mutation_test_results,
             "additional_instructions_text": self.additional_instructions,
             "language": self.language,
             "max_tests": MAX_TESTS_PER_RUN,
@@ -146,6 +150,7 @@ class PromptBuilder:
             "stdout": self.stdout_from_run,
             "stderr": self.stderr_from_run,
         }
+        logging.info(f'MUTATION_TEST_RESULTS: {self.mutation_test_results}')
         environment = Environment(undefined=StrictUndefined)
         try:
             system_prompt = environment.from_string(
@@ -181,6 +186,7 @@ class PromptBuilder:
             "code_coverage_report": self.code_coverage_report,
             "additional_includes_section": self.included_files,
             "failed_tests_section": self.failed_test_runs,
+            "mutation_test_results": self.mutation_test_results,
             "additional_instructions_text": self.additional_instructions,
             "language": self.language,
             "max_tests": MAX_TESTS_PER_RUN,
