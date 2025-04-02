@@ -5,15 +5,16 @@ system="""\
 user="""\
 ## Overview
 You are a code assistant that accepts a {{ language }} source file, and a {{ language }} test file.
-Your goal is to generate additional comprehensive unit tests to complement the existing test suite, in order to increase the code coverage against the source file.
+Your goal is to generate additional comprehensive unit tests to complement the existing test suite, in order to increase the code coverage against the source file and improve the mutation score.
 
 Additional guidelines:
 - Step by step carefully analyze the provided code. Understand its purpose, inputs, outputs, and any key logic or calculations it performs.
-- Brainstorm a list of diverse and meaningful test cases you think will be necessary to fully validate the correctness and functionality of the code, and achieve 100% code coverage.
+- Brainstorm a list of diverse and meaningful test cases you think will be necessary to fully validate the correctness and functionality of the code, and achieve high code coverage and mutation score.
 - After each individual test has been added, review all tests to ensure they cover the full range of scenarios, including how to handle exceptions or errors.
 - If the original test file contains a test suite, assume that each generated test will be a part of the same suite. Ensure that the new tests are consistent with the existing test suite in terms of style, naming conventions, and structure.
 - You may need to use **Equivalent Partitioning** strategy to cover as many test scenarios as possible and reduce the number of test cases while maintaing good code coverage.
 - There are some cases that result multiple correct answers, you should consider it carefully and define the assertions not so strictly.
+- Pay special attention to any mutation test results, which indicate that certain parts of the code can be mutated without causing tests to fail. These are important areas to focus on.
 
 ## Source File
 Here is the source file that you will be writing tests against, called `{{ source_file_name }}`.
@@ -65,8 +66,13 @@ If the current tests are part of a class and contain a 'self' input, than the ge
 {% endif %}
 
 
-## Code Coverage
-Based on the code coverage report below, your goal is to suggest new test cases for the test file `{{ test_file_name }}` against the source file `{{ source_file_name }}` that would increase the coverage, meaning cover missing lines of code.
+## Code Coverage and Mutation Score
+Current Code Coverage: {{ current_coverage }}%
+Current Mutation Score: {{ current_mutation_score }}%
+Desired Code Coverage: {{ desired_coverage }}%
+Desired Mutation Score: {{ desired_mutation_score }}%
+
+Based on the code coverage report below, your goal is to suggest new test cases for the test file `{{ test_file_name }}` against the source file `{{ source_file_name }}` that would increase the coverage, meaning cover missing lines of code, and improve the mutation score by catching mutations that are currently surviving.
 =========
 {{ code_coverage_report|trim }}
 =========
@@ -90,7 +96,7 @@ class SingleTest(BaseModel):
 class NewTests(BaseModel):
     language: str = Field(description="The programming language of the source code")
     existing_test_function_signature: str = Field(description="A single line repeating a signature header of one of the existing test functions")
-    new_tests: List[SingleTest] = Field(min_items=1, max_items={{ max_tests }}, description="A list of new test functions to append to the existing test suite, aiming to increase the code coverage. Each test should run as-is, without requiring any additional inputs or setup code. Don't introduce new dependencies")
+    new_tests: List[SingleTest] = Field(min_items=1, max_items={{ max_tests }}, description="A list of new test functions to append to the existing test suite, aiming to increase the code coverage and improve mutation score. Each test should run as-is, without requiring any additional inputs or setup code. Don't introduce new dependencies")
 =====
 
 

@@ -31,7 +31,7 @@ class MutationTester:
     self.src_dir = src_dir
     self.test_dir = test_dir
     self.project_root = project_root
-    self.run_command = f"{self.test_command} --target {self.src_dir} --unit-test {self.test_dir} -m --runner pytest --report {self.report_yaml_file} --report-html {self.report_html_file} --percentage 10"
+    self.run_command = f"{self.test_command} --target {self.src_dir} --unit-test {self.test_dir} -m --runner pytest --report {self.report_yaml_file}"
     
     
   MUTATION_OPERATOR_MAP = {
@@ -100,10 +100,13 @@ class MutationTester:
           print(f"Attempt to read {self.report_yaml_file} the {attempt + 1} times failed: {e}. Retrying...")
         else:
           print(f"Attempt to read {self.report_yaml_file} the {attempt + 1} times failed: {e}. No more retries.")
-          raise
+          return None
   
   def generate_prompt(self) -> str:
     yaml_data = self.load_report()
+    if yaml_data is None:
+      return ""
+    
     # add a delay to allow the file to be read
     print(f"Data loaded, size: {len(yaml_data)}")
     
@@ -120,35 +123,61 @@ class MutationTester:
     # 2. Mutations
     mutation_list = yaml_data.get("mutations", [])
     survived_mutants = []
+    
+    # Enhanced structure to store more details about each mutant
+    mutant_details = []
 
     for mutation_item in mutation_list:
         status = mutation_item.get("status")
         # Each mutation_item can have multiple "mutations" sub-items
         sub_mutations = mutation_item.get("mutations", [])
-        # We'll gather line/operator from each sub-mutation
-        for sub in sub_mutations:
-            lineno = sub.get("lineno")
-            operator = sub.get("operator")
-            if status == "survived":
+        
+        if status == "survived":
+            # We'll gather line/operator from each sub-mutation
+            for sub in sub_mutations:
+                lineno = sub.get("lineno")
+                operator = sub.get("operator")
                 survived_mutants.append((lineno, operator))
+                
+                # Store detailed information about the mutant
+                mutant_details.append({
+                    "line": lineno,
+                    "operator": operator,
+                    "operator_description": self.get_operator_full_name(operator),
+                })
 
     # 3. Build the prompt text
     prompt_lines = []
     prompt_lines.append("## Results of Mutation Testing")
     prompt_lines.append(f"**Mutation Score**: {mutation_score:.2f}%")
     prompt_lines.append(f"**Nodes Covered**: {covered_nodes}/{all_nodes}")
-
+    
     if survived_mutants:
-        prompt_lines.append("The following mutants **survived**:")
-        for i, (line_no, op) in enumerate(survived_mutants, start=1):
-            prompt_lines.append(f"{i}) line {line_no}, operator: {self.get_operator_full_name(op)}")
+        prompt_lines.append("\n### Understanding Mutation Testing")
+        prompt_lines.append("Mutation testing creates small changes (mutants) in the code to verify if tests can detect these changes.")
+        prompt_lines.append("When a mutant 'survives', it means our tests couldn't detect that the code was modified, indicating a weakness in our test suite.")
+        
+        prompt_lines.append("\n### Surviving Mutants")
+        for i, mutant in enumerate(mutant_details, start=1):
+            prompt_lines.append(f"\n**{i}. Line {mutant['line']}: {mutant['operator_description']}**")
+            
+            # Add specific recommendations based on mutation operator type
+            if mutant['operator'] == "ROR":
+                prompt_lines.append("This mutant changed a relational operator (e.g., > to >=, == to !=). Your test should specifically verify boundary conditions.")
+            elif mutant['operator'] in ["AOR", "AOD"]:
+                prompt_lines.append("This mutant modified arithmetic operations. Your test should verify calculations with specific values that would fail if the operation is changed.")
+            elif mutant['operator'] == "LCR":
+                prompt_lines.append("This mutant changed logical connectors (e.g., && to ||). Your test should check conditions where both original and mutated connectors would behave differently.")
     else:
         prompt_lines.append("No surviving mutants! Great job.")
 
 
-    prompt_lines.append("")
-    prompt_lines.append("**Goal**: Please generate or refine tests so that these surviving mutants are killed.")
-    prompt_lines.append("Focus on the lines and operators that survived. For each, we need a test scenario that fails if that mutation occurs.")
+    prompt_lines.append("\n### Testing Goal")
+    prompt_lines.append("Please generate or refine tests that will detect these surviving mutants. For each mutant:")
+    prompt_lines.append("1. Create a test that will pass with the original code but fail with the mutated code")
+    prompt_lines.append("2. Ensure each test checks the specific behavior that would be altered by the mutation")
+    prompt_lines.append("3. Use descriptive test names that indicate what mutation they are targeting")
+    prompt_lines.append("4. Include assertions that directly validate the behavior affected by the mutation")
 
     return "\n".join(prompt_lines)
 

@@ -58,15 +58,26 @@ def parse_args():
     )
     parser.add_argument(
         "--desired-coverage",
-        type=int,
-        default=90,
-        help="The desired coverage percentage. Default: %(default)s.",
+        type=float,
+        default=70,
+        help="The desired coverage percentage. Defaults to 70.",
+    )
+    parser.add_argument(
+        "--desired-mutation-score",
+        type=float,
+        default=70,
+        help="The desired mutation score percentage. Defaults to 70.",
+    )
+    parser.add_argument(
+        "--strict-mutation-score",
+        action="store_true",
+        help="Whether to use strict mutation score. If enabled, tests must improve mutation score to be considered valid.",
     )
     parser.add_argument(
         "--max-iterations",
         type=int,
         default=10,
-        help="The maximum number of iterations. Default: %(default)s.",
+        help="The maximum number of iterations to run. Defaults to 10.",
     )
     parser.add_argument(
         "--additional-instructions",

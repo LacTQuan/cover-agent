@@ -33,6 +33,14 @@ Below is a list of failed tests that were generated in previous iterations. Do n
 ======
 """
 
+MUTATION_TESTS_TEXT = """
+## Mutation Testing Results
+The following are the results from mutation testing, which identifies weaknesses in our test suite. These results are critical for improving test quality.
+======
+{mutation_test_results}
+======
+"""
+
 
 class PromptBuilder:
     def __init__(
@@ -47,6 +55,7 @@ class PromptBuilder:
         language: str = "python",
         testing_framework: str = "NOT KNOWN",
         project_root: str = "",
+        validator = None,
     ):
         """
         The `PromptBuilder` class is responsible for building a formatted prompt string by replacing placeholders with the actual content of files read during initialization. It takes in various paths and settings as parameters and provides a method to generate the prompt.
@@ -60,6 +69,7 @@ class PromptBuilder:
             additional_instructions (str): The formatted additional instructions section.
             failed_test_runs (str): The formatted failed test runs section.
             language (str): The programming language of the source and test files.
+            validator (UnitTestValidator): The validator instance to get coverage and mutation score information.
 
         Methods:
             __init__(self, prompt_template_path: str, source_file_path: str, test_file_path: str, code_coverage_report: str, included_files: str = "", additional_instructions: str = "", failed_test_runs: str = "")
@@ -81,6 +91,7 @@ class PromptBuilder:
         self.code_coverage_report = code_coverage_report
         self.language = language
         self.testing_framework = testing_framework
+        self.validator = validator
 
         # add line numbers to each line in 'source_file'. start from 1
         self.source_file_numbered = "\n".join(
@@ -109,7 +120,11 @@ class PromptBuilder:
             else ""
         )
         
-        self.mutation_test_results = mutation_test_results
+        self.mutation_test_results = (
+            MUTATION_TESTS_TEXT.format(mutation_test_results=mutation_test_results)
+            if mutation_test_results
+            else ""
+        )
 
         self.stdout_from_run = ""
         self.stderr_from_run = ""
@@ -149,6 +164,10 @@ class PromptBuilder:
             "testing_framework": self.testing_framework,
             "stdout": self.stdout_from_run,
             "stderr": self.stderr_from_run,
+            "current_coverage": round(self.validator.current_coverage * 100, 2) if self.validator else 0,
+            "current_mutation_score": round(self.validator.current_mutation_score, 2) if self.validator else 0,
+            "desired_coverage": self.validator.desired_coverage if self.validator else 70,
+            "desired_mutation_score": self.validator.desired_mutation_score if self.validator else 70,
         }
         logging.info(f'MUTATION_TEST_RESULTS: {self.mutation_test_results}')
         environment = Environment(undefined=StrictUndefined)

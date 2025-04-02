@@ -64,7 +64,9 @@ class CoverAgent:
             use_report_coverage_feature_flag=args.use_report_coverage_feature_flag,
             diff_coverage=args.diff_coverage,
             comparison_branch=args.branch,
-            num_attempts=args.run_tests_multiple_times
+            num_attempts=args.run_tests_multiple_times,
+            desired_mutation_score=args.desired_mutation_score,
+            strict_mutation_score=args.strict_mutation_score,
         )
 
     def parse_command_to_run_only_a_single_test(self, args):
@@ -200,23 +202,45 @@ class CoverAgent:
 
             # Check if the desired coverage has been reached
             failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.test_validator.get_coverage()
-            if self.test_validator.current_coverage >= (self.test_validator.desired_coverage / 100):
-                break
+            
+            # Determine if we've met our goals based on strict_mutation_score setting
+            coverage_goal_met = self.test_validator.current_coverage >= (self.test_validator.desired_coverage / 100)
+            mutation_goal_met = self.test_validator.current_mutation_score >= self.test_validator.desired_mutation_score
+            
+            if self.test_validator.strict_mutation_score:
+                # If strict, both goals must be met
+                if coverage_goal_met and mutation_goal_met:
+                    break
+            else:
+                # If not strict, only coverage goal needs to be met
+                if coverage_goal_met:
+                    break
 
-        # Log the final coverage
+        # Log the final coverage and mutation score
         if self.test_validator.current_coverage >= (self.test_validator.desired_coverage / 100):
-            self.logger.info(
-                f"Reached above target coverage of {self.test_validator.desired_coverage}% (Current Coverage: {round(self.test_validator.current_coverage * 100, 2)}%) in {iteration_count} iterations."
-            )
+            coverage_message = f"Reached above target coverage of {self.test_validator.desired_coverage}% (Current Coverage: {round(self.test_validator.current_coverage * 100, 2)}%)"
+            
+            if self.test_validator.strict_mutation_score:
+                if self.test_validator.current_mutation_score >= self.test_validator.desired_mutation_score:
+                    self.logger.info(f"{coverage_message} and mutation score of {self.test_validator.current_mutation_score:.2f}% in {iteration_count} iterations.")
+                else:
+                    self.logger.info(f"{coverage_message} but did not reach target mutation score of {self.test_validator.desired_mutation_score}% (Current: {self.test_validator.current_mutation_score:.2f}%) in {iteration_count} iterations.")
+            else:
+                self.logger.info(f"{coverage_message} in {iteration_count} iterations. Current mutation score: {self.test_validator.current_mutation_score:.2f}%")
+                
         elif iteration_count == self.args.max_iterations:
             if self.args.diff_coverage:
                 failure_message = f"Reached maximum iteration limit without achieving desired diff coverage. Current Coverage: {round(self.test_validator.current_coverage * 100, 2)}%"
             else:
-                failure_message = f"Reached maximum iteration limit without achieving desired coverage. Current Coverage: {round(self.test_validator.current_coverage * 100, 2)}%"
+                failure_message = f"Reached maximum iteration limit without achieving desired coverage. Current Coverage: {round(self.test_validator.current_coverage * 100, 2)}%, Current Mutation Score: {self.test_validator.current_mutation_score:.2f}%"
             if self.args.strict_coverage:
                 # User requested strict coverage (similar to "--cov-fail-under in pytest-cov"). Fail with exist code 2.
                 self.logger.error(failure_message)
                 sys.exit(2)
+            elif self.test_validator.strict_mutation_score and self.test_validator.current_mutation_score < self.test_validator.desired_mutation_score:
+                # User requested strict mutation score and we haven't met the goal. Fail with exit code 3.
+                self.logger.error(f"Failed to achieve desired mutation score of {self.test_validator.desired_mutation_score}%. Current mutation score: {self.test_validator.current_mutation_score:.2f}%")
+                sys.exit(3)
             else:
                 self.logger.info(failure_message)
 

@@ -1,4 +1,5 @@
 from wandb.sdk.data_types.trace_tree import Trace
+import time
 import traceback
 import datetime
 import json
@@ -37,6 +38,8 @@ class UnitTestValidator:
         diff_coverage: bool = False,
         comparison_branch: str = "main",
         num_attempts: int = 1,
+        desired_mutation_score: float = 70,  # Default to 70% if not specified
+        strict_mutation_score: bool = False,  # Default to False if not specified
     ):
         """
         Initialize the UnitTestValidator class with the provided parameters.
@@ -56,6 +59,12 @@ class UnitTestValidator:
             use_report_coverage_feature_flag (bool, optional): Setting this to True considers the coverage of all the files in the coverage report. 
                                                                This means we consider a test as good if it increases coverage for a different 
                                                                file other than the source file. Defaults to False.
+            project_root (str, optional): The root directory of the project. Defaults to an empty string.
+            diff_coverage (bool, optional): Whether to use diff coverage. Defaults to False.
+            comparison_branch (str, optional): The branch to compare for diff coverage. Defaults to "main".
+            num_attempts (int, optional): The number of attempts to run the test. Defaults to 1.
+            desired_mutation_score (float, optional): The desired mutation score percentage. Defaults to 70.
+            strict_mutation_score (bool, optional): Whether to use strict mutation score. Defaults to False.
 
         Returns:
             None
@@ -81,6 +90,8 @@ class UnitTestValidator:
         self.diff_coverage = diff_coverage
         self.comparison_branch = comparison_branch
         self.num_attempts = num_attempts
+        self.desired_mutation_score = desired_mutation_score
+        self.strict_mutation_score = strict_mutation_score
 
         # Objects to instantiate
         self.ai_caller = AICaller(model=llm_model, api_base=api_base, prompt_path=project_root + "/prompt.txt")
@@ -118,13 +129,20 @@ class UnitTestValidator:
             use_report_coverage_feature_flag=self.use_report_coverage_feature_flag,
             diff_coverage_report_path=self.diff_cover_report_path,
         )
+        
+        # Initialize mutation testing state
+        self.mutation_testing_enabled = True  # Can be set to False through config if needed
+        self.mutation_tests_attempted = 0
+        self.mutation_tests_succeeded = 0
+        self.last_mutation_score = 0
+        self.current_mutation_score = 0
 
     def get_coverage(self):
         """
         Run code coverage and build the prompt to be used for generating tests.
 
         Returns:
-            None
+            A tuple containing failed test runs, mutation test results, language, testing framework, and code coverage report.
         """
         # Run coverage and build the prompt
         self.run_coverage()
@@ -185,10 +203,11 @@ class UnitTestValidator:
             included_files=self.included_files,
             additional_instructions=self.additional_instructions,
             failed_test_runs="", # see if this can be None
-            mutation_test_results="", # see if this can be None
+            mutation_test_results=self.mutation_test_results, # Pass current mutation test results
             language=self.language,
             testing_framework=self.testing_framework,
             project_root=self.project_root,
+            validator=self,  # Pass self as the validator
         )
 
     def initial_test_suite_analysis(self):
@@ -513,26 +532,81 @@ class UnitTestValidator:
                 
                 # Continue running mutation tests if the test passed
                 try:
-                    mutation_tester = MutationTester()
-                    self.logger.info(
-                        f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
-                    )
-                    _, stderr, exit_code, _ = mutation_tester.run()
+                    if self.mutation_testing_enabled:
+                        self.mutation_tests_attempted += 1
+                        mutation_tester = MutationTester()
+                        self.logger.info(
+                            f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
+                        )
+                        stdout, stderr, exit_code, _ = mutation_tester.run()
 
-                    # get the prompt for the mutation test results
-                    self.mutation_test_results = mutation_tester.generate_prompt()
-                    
-                    mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
-                    
-                    # clean up the mutants folder
-                    # os.system(f"rm -rf {self.project_root}/{mut_report_html_file.split('.')[0]}/mutants")
+                        # get the prompt for the mutation test results
+                        # wait 1 second to allow the report to be written
+                        time.sleep(1)
+                        self.mutation_test_results = mutation_tester.generate_prompt()
+                        
+                        # Log mutation test results
+                        if self.mutation_test_results:
+                            self.logger.info("Mutation testing completed successfully")
+                            # Extract mutation score for logging
+                            mutation_score_match = re.search(r"\*\*Mutation Score\*\*: (\d+\.\d+)%", self.mutation_test_results)
+                            if mutation_score_match:
+                                mutation_score = float(mutation_score_match.group(1))
+                                self.logger.info(f"Mutation Score: {mutation_score:.2f}%")
+                                
+                                # Track if mutation score improved
+                                if mutation_score > self.last_mutation_score:
+                                    self.logger.info(f"Mutation score improved from {self.last_mutation_score:.2f}% to {mutation_score:.2f}%")
+                                    self.mutation_tests_succeeded += 1
+                                elif self.strict_mutation_score:
+                                    # If strict_mutation_score is enabled and mutation score didn't improve, fail the test
+                                    self.logger.info(f"Mutation score did not improve (current: {mutation_score:.2f}%, previous: {self.last_mutation_score:.2f}%) and strict_mutation_score is enabled. Rolling back.")
+                                    with open(self.test_file_path, "w") as test_file:
+                                        test_file.write(original_content)
+                                    fail_details = {
+                                        "status": "FAIL",
+                                        "reason": "Mutation score did not improve and strict_mutation_score is enabled",
+                                        "exit_code": exit_code,
+                                        "stderr": stderr, 
+                                        "stdout": stdout,
+                                        "test": generated_test,
+                                        "language": self.language,
+                                        "source_file": self.source_code,
+                                        "original_test_file": original_content,
+                                        "processed_test_file": processed_test,
+                                        "mut_report_html_file": mut_report_html_file,
+                                        "mut_report_yaml_file": mut_report_yaml_file,
+                                    }
+                                    self.failed_test_runs.append(
+                                        {
+                                            "code": fail_details["test"],
+                                            "error_message": "Mutation score did not improve",
+                                        }
+                                    )
+                                    return fail_details
+                                
+                                self.last_mutation_score = mutation_score
+                                self.current_mutation_score = mutation_score
+                                
+                            # Count surviving mutants for logging
+                            surviving_mutants_count = self.mutation_test_results.count("Line ")
+                            self.logger.info(f"Number of surviving mutants: {surviving_mutants_count}")
+                        else:
+                            self.logger.warning("Mutation testing completed but no results were generated")
+                        
+                        mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
+                        
+                        # clean up the mutants folder
+                        # os.system(f"rm -rf {self.project_root}/{mut_report_html_file.split('.')[0]}/mutants")
 
-                    if exit_code != 0:
-                        self.logger.error(f"Error running mutation tests: {stderr}")
-                    
+                        if exit_code != 0:
+                            self.logger.error(f"Error running mutation tests: {stderr}")
+                    else:
+                        self.logger.info("Mutation testing is disabled")
+                        
                 except Exception as e:
-                    self.logger.error(f"Error running mutation tests: {e}")
-                    self.logger.error(traceback.format_exc())
+                    self.logger.info(f"Error running mutation tests: {e}")
+                    self.logger.info(traceback.format_exc())
 
 
 
@@ -676,6 +750,9 @@ class UnitTestValidator:
             "coverage_type": self.coverage_type,
             "desired_coverage": self.desired_coverage,
             "additional_instructions": self.additional_instructions,
+            "current_coverage": round(self.current_coverage * 100, 2) if hasattr(self, 'current_coverage') else 0,
+            "current_mutation_score": round(self.current_mutation_score, 2),
+            "desired_mutation_score": self.desired_mutation_score,
         }
 
     def to_json(self):
@@ -801,3 +878,12 @@ class UnitTestValidator:
             f'Fatal: Error running diff coverage command. Are you sure the command is correct? "{coverage_command}"'
             f"\nExit code {exit_code}. \nStdout: \n{stdout} \nStderr: \n{stderr}"
         )
+
+    def get_mutation_score(self):
+        """
+        Get the current mutation score.
+
+        Returns:
+            float: The current mutation score as a percentage.
+        """
+        return self.current_mutation_score

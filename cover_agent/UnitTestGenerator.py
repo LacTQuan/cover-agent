@@ -230,8 +230,27 @@ class UnitTestGenerator:
         Raises:
             Exception: If there is an error during test generation, such as a parsing error while processing the AI model response.
         """
+        # Check if we have mutation test results and analyze them
+        mutation_focused = False
+        if mutation_test_results:
+            # If we have mutation test results, check if they contain surviving mutants
+            if "Surviving Mutants" in mutation_test_results:
+                self.logger.info("Detected surviving mutants in mutation test results - focusing on mutation-driven test generation")
+                mutation_focused = True
+            else:
+                self.logger.info("No surviving mutants detected in mutation test results")
+        
+        # Build the prompt
         self.prompt = self.build_prompt(failed_test_runs, mutation_test_results, language, testing_framework, code_coverage_report)
-        response, prompt_token_count, response_token_count =  self.ai_caller.call_model(prompt=self.prompt)
+        
+        # If focusing on mutation testing, add specific instructions to the prompt
+        if mutation_focused and "user" in self.prompt:
+            mutation_emphasis = "\n\nIMPORTANT: Focus on generating tests that target the surviving mutants identified in the mutation testing results. These tests should prioritize detecting the specific code changes described by each mutation operator."
+            self.prompt["user"] += mutation_emphasis
+            self.logger.info("Added mutation-specific emphasis to prompt")
+        
+        # Call the LLM
+        response, prompt_token_count, response_token_count = self.ai_caller.call_model(prompt=self.prompt)
 
         self.total_input_token_count += prompt_token_count
         self.total_output_token_count += response_token_count
@@ -246,6 +265,17 @@ class UnitTestGenerator:
             # Save test behavior to a file
             print(f'[TEST BEHAVIOR]: {tests_dict}')
             test_behaviors = tests_dict.get("new_tests", [])
+            
+            # Log information about generated tests
+            if mutation_focused and test_behaviors:
+                self.logger.info(f"Generated {len(test_behaviors)} tests targeting mutations")
+                # Add logging about which mutations the tests are targeting
+                for test in test_behaviors:
+                    test_name = test.get("test_name", "").strip()
+                    test_behavior = test.get("test_behavior", "").strip()
+                    if "mutation" in test_behavior.lower():
+                        self.logger.info(f"Test {test_name} targets mutation: {test_behavior}")
+            
             with open(self.project_root + "/test_behavior.txt", "a") as f:
                 for test_behavior in test_behaviors:
                     f.write(f"Test Behavior: {test_behavior.get('test_behavior')}\n")
