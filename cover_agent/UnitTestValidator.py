@@ -403,6 +403,7 @@ class UnitTestValidator:
         """
         mut_report_html_file = ""
         mut_report_yaml_file = ""
+        mutation_cov_increased = False
         # Store original content of the test file
         with open(self.test_file_path, "r") as test_file:
             original_content = test_file.read()
@@ -555,6 +556,7 @@ class UnitTestValidator:
                                 self.logger.info(f"Mutation Score: {mutation_score:.2f}%")
                                 
                                 # Track if mutation score improved
+                                mutation_cov_increased = mutation_score > self.desired_mutation_score
                                 if mutation_score > self.last_mutation_score:
                                     self.logger.info(f"Mutation score improved from {self.last_mutation_score:.2f}% to {mutation_score:.2f}%")
                                     self.mutation_tests_succeeded += 1
@@ -616,7 +618,7 @@ class UnitTestValidator:
                         time_of_test_command
                     )
 
-                    if new_percentage_covered <= self.current_coverage:
+                    if new_percentage_covered <= self.current_coverage and mutation_cov_increased == False:
                         # Coverage has not increased, rollback the test by removing it from the test file
                         with open(self.test_file_path, "w") as test_file:
                             test_file.write(original_content)
