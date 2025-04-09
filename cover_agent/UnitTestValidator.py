@@ -16,6 +16,7 @@ from cover_agent.Runner import Runner
 from cover_agent.MutationTester import MutationTester
 from cover_agent.settings.config_loader import get_settings
 from cover_agent.utils import load_yaml
+from cover_agent.FailedTestAnalyzer import FailedTestAnalyzer
 
 MUTMUT_TEST_COMMAND = "mutmut run"
 
@@ -136,7 +137,7 @@ class UnitTestValidator:
         self.mutation_tests_succeeded = 0
         self.last_mutation_score = 0
         self.current_mutation_score = 0
-
+        
     def get_coverage(self):
         """
         Run code coverage and build the prompt to be used for generating tests.
@@ -532,83 +533,83 @@ class UnitTestValidator:
                     return fail_details
                 
                 # Continue running mutation tests if the test passed
-                try:
-                    if self.mutation_testing_enabled:
-                        self.mutation_tests_attempted += 1
-                        mutation_tester = MutationTester()
-                        self.logger.info(
-                            f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
-                        )
-                        stdout, stderr, exit_code, _ = mutation_tester.run()
+                # try:
+                #     if self.mutation_testing_enabled:
+                #         self.mutation_tests_attempted += 1
+                #         mutation_tester = MutationTester()
+                #         self.logger.info(
+                #             f'Running mutation tests with the following command: "{mutation_tester.get_run_command()}"'
+                #         )
+                #         stdout, stderr, exit_code, _ = mutation_tester.run()
 
-                        # get the prompt for the mutation test results
-                        # wait 1 second to allow the report to be written
-                        time.sleep(1)
-                        self.mutation_test_results = mutation_tester.generate_prompt()
+                #         # get the prompt for the mutation test results
+                #         # wait 1 second to allow the report to be written
+                #         time.sleep(1)
+                #         self.mutation_test_results = mutation_tester.generate_prompt()
                         
-                        # Log mutation test results
-                        if self.mutation_test_results:
-                            self.logger.info("Mutation testing completed successfully")
-                            # Extract mutation score for logging
-                            mutation_score_match = re.search(r"\*\*Mutation Score\*\*: (\d+\.\d+)%", self.mutation_test_results)
-                            if mutation_score_match:
-                                mutation_score = float(mutation_score_match.group(1))
-                                self.logger.info(f"Mutation Score: {mutation_score:.2f}%")
+                #         # Log mutation test results
+                #         if self.mutation_test_results:
+                #             self.logger.info("Mutation testing completed successfully")
+                #             # Extract mutation score for logging
+                #             mutation_score_match = re.search(r"\*\*Mutation Score\*\*: (\d+\.\d+)%", self.mutation_test_results)
+                #             if mutation_score_match:
+                #                 mutation_score = float(mutation_score_match.group(1))
+                #                 self.logger.info(f"Mutation Score: {mutation_score:.2f}%")
                                 
-                                # Track if mutation score improved
-                                mutation_cov_increased = mutation_score > self.desired_mutation_score
-                                if mutation_score > self.last_mutation_score:
-                                    self.logger.info(f"Mutation score improved from {self.last_mutation_score:.2f}% to {mutation_score:.2f}%")
-                                    self.mutation_tests_succeeded += 1
-                                elif self.strict_mutation_score:
-                                    # If strict_mutation_score is enabled and mutation score didn't improve, fail the test
-                                    self.logger.info(f"Mutation score did not improve (current: {mutation_score:.2f}%, previous: {self.last_mutation_score:.2f}%) and strict_mutation_score is enabled. Rolling back.")
-                                    with open(self.test_file_path, "w") as test_file:
-                                        test_file.write(original_content)
-                                    fail_details = {
-                                        "status": "FAIL",
-                                        "reason": "Mutation score did not improve and strict_mutation_score is enabled",
-                                        "exit_code": exit_code,
-                                        "stderr": stderr, 
-                                        "stdout": stdout,
-                                        "test": generated_test,
-                                        "language": self.language,
-                                        "source_file": self.source_code,
-                                        "original_test_file": original_content,
-                                        "processed_test_file": processed_test,
-                                        "mut_report_html_file": mut_report_html_file,
-                                        "mut_report_yaml_file": mut_report_yaml_file,
-                                    }
-                                    self.failed_test_runs.append(
-                                        {
-                                            "code": fail_details["test"],
-                                            "error_message": "Mutation score did not improve",
-                                        }
-                                    )
-                                    return fail_details
+                #                 # Track if mutation score improved
+                #                 mutation_cov_increased = mutation_score > self.desired_mutation_score
+                #                 if mutation_score > self.last_mutation_score:
+                #                     self.logger.info(f"Mutation score improved from {self.last_mutation_score:.2f}% to {mutation_score:.2f}%")
+                #                     self.mutation_tests_succeeded += 1
+                #                 elif self.strict_mutation_score:
+                #                     # If strict_mutation_score is enabled and mutation score didn't improve, fail the test
+                #                     self.logger.info(f"Mutation score did not improve (current: {mutation_score:.2f}%, previous: {self.last_mutation_score:.2f}%) and strict_mutation_score is enabled. Rolling back.")
+                #                     with open(self.test_file_path, "w") as test_file:
+                #                         test_file.write(original_content)
+                #                     fail_details = {
+                #                         "status": "FAIL",
+                #                         "reason": "Mutation score did not improve and strict_mutation_score is enabled",
+                #                         "exit_code": exit_code,
+                #                         "stderr": stderr, 
+                #                         "stdout": stdout,
+                #                         "test": generated_test,
+                #                         "language": self.language,
+                #                         "source_file": self.source_code,
+                #                         "original_test_file": original_content,
+                #                         "processed_test_file": processed_test,
+                #                         "mut_report_html_file": mut_report_html_file,
+                #                         "mut_report_yaml_file": mut_report_yaml_file,
+                #                     }
+                #                     self.failed_test_runs.append(
+                #                         {
+                #                             "code": fail_details["test"],
+                #                             "error_message": "Mutation score did not improve",
+                #                         }
+                #                     )
+                #                     return fail_details
                                 
-                                self.last_mutation_score = mutation_score
-                                self.current_mutation_score = mutation_score
+                #                 self.last_mutation_score = mutation_score
+                #                 self.current_mutation_score = mutation_score
                                 
-                            # Count surviving mutants for logging
-                            surviving_mutants_count = self.mutation_test_results.count("Line ")
-                            self.logger.info(f"Number of surviving mutants: {surviving_mutants_count}")
-                        else:
-                            self.logger.warning("Mutation testing completed but no results were generated")
+                #             # Count surviving mutants for logging
+                #             surviving_mutants_count = self.mutation_test_results.count("Line ")
+                #             self.logger.info(f"Number of surviving mutants: {surviving_mutants_count}")
+                #         else:
+                #             self.logger.warning("Mutation testing completed but no results were generated")
                         
-                        mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
+                #         mut_report_html_file, mut_report_yaml_file = mutation_tester.get_report_files() 
                         
-                        # clean up the mutants folder
-                        # os.system(f"rm -rf {self.project_root}/{mut_report_html_file.split('.')[0]}/mutants")
+                #         # clean up the mutants folder
+                #         # os.system(f"rm -rf {self.project_root}/{mut_report_html_file.split('.')[0]}/mutants")
 
-                        if exit_code != 0:
-                            self.logger.error(f"Error running mutation tests: {stderr}")
-                    else:
-                        self.logger.info("Mutation testing is disabled")
+                #         if exit_code != 0:
+                #             self.logger.error(f"Error running mutation tests: {stderr}")
+                #     else:
+                #         self.logger.info("Mutation testing is disabled")
                         
-                except Exception as e:
-                    self.logger.info(f"Error running mutation tests: {e}")
-                    self.logger.info(traceback.format_exc())
+                # except Exception as e:
+                #     self.logger.info(f"Error running mutation tests: {e}")
+                #     self.logger.info(traceback.format_exc())
 
 
 

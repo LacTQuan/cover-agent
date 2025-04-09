@@ -10,6 +10,7 @@ SETTINGS_FILES = [
     "analyze_test_run_failure.toml",
     "analyze_test_against_context.toml",
     "adapt_test_command_for_a_single_test_via_ai.toml",
+    "analyze_failed_test.toml",
     "configuration.toml",
 ]
 

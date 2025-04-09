@@ -185,12 +185,13 @@ class PromptBuilder:
         # print(f"#### user_prompt:\n\n{user_prompt}")
         return {"system": system_prompt, "user": user_prompt}
 
-    def build_prompt_custom(self, file) -> dict:
+    def build_prompt_custom(self, file: str, **kwargs) -> dict:
         """
         Builds a custom prompt by replacing placeholders with actual content from files and settings.
 
         Parameters:
             file (str): The file to retrieve settings for building the prompt.
+            **kwargs: Additional variables to add to the template context.
 
         Returns:
             dict: A dictionary containing the system and user prompts.
@@ -204,7 +205,8 @@ class PromptBuilder:
             "test_file": self.test_file,
             "code_coverage_report": self.code_coverage_report,
             "additional_includes_section": self.included_files,
-            "failed_tests_section": self.failed_test_runs,
+            "failed_test_runs": self.failed_test_runs,
+            "failed_tests": self.failed_test_runs,  # Add backward compatibility
             "mutation_test_results": self.mutation_test_results,
             "additional_instructions_text": self.additional_instructions,
             "language": self.language,
@@ -214,6 +216,10 @@ class PromptBuilder:
             "stderr": self.stderr_from_run,
             "processed_test_file": self.processed_test_file,
         }
+        
+        # Add any additional kwargs to the variables
+        variables.update(kwargs)
+        
         environment = Environment(undefined=StrictUndefined)
         try:
             settings = get_settings().get(file)

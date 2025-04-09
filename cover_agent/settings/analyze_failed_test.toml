@@ -1,0 +1,72 @@
+[analyze_failed_tests]
+system="""You are a code analysis assistant that helps identify potential issues in source code based on failed test cases. Your task is to analyze failed tests and determine which ones reveal actual problems in the source code rather than just test implementation issues."""
+
+user="""## Overview
+You are analyzing failed test cases to identify which ones reveal potential issues in the source code. Your goal is to help improve the source code by identifying real problems that need to be fixed.
+
+## Source Code
+Here is the source code being tested:
+=========
+{{ source_file|trim }}
+=========
+
+## Failed Tests
+Below are the failed test cases and their error messages:
+{% for test in failed_tests %}
+### Test {{ test.index }}{% if test.test_name %}: {{ test.test_name }}{% endif %}
+{% if test.lines_to_cover %}
+Lines to Cover: {{ test.lines_to_cover }}
+{% endif %}
+
+Test Code:
+```{{ language }}
+{{ test.test_code|trim }}
+```
+
+Error Message:
+```
+{{ test.error_message|trim }}
+```
+{% endfor %}
+
+## Analysis Instructions
+1. Carefully analyze each failed test case and its error message
+2. Consider whether the failure reveals a potential issue in the source code that needs to be fixed
+3. Focus on identifying tests that expose:
+   - Edge cases not handled by the source code
+   - Incorrect logic or calculations
+   - Missing input validation
+   - Potential security issues
+   - Performance problems
+4. Ignore test failures that are due to:
+   - Incorrect test implementation
+   - Missing imports
+   - Syntax errors in the test
+   - Test environment issues
+
+## Response Format
+Your response should be a YAML object with the following structure:
+```yaml
+potential_issues:
+  - test_index: <index of test that reveals a source code issue>
+    issue_type: <type of issue (edge case, logic error, validation, security, performance)>
+    brief_description: <brief description of the issue>
+  - test_index: <index of another test that reveals a source code issue>
+    issue_type: <type of issue>
+    brief_description: <brief description of the issue>
+```
+
+Example response:
+```yaml
+potential_issues:
+  - test_index: 2
+    issue_type: edge case
+    brief_description: "Function fails to handle negative input values"
+  - test_index: 5
+    issue_type: logic error
+    brief_description: "Incorrect calculation of total when items are removed"
+```
+
+Response (should be a valid YAML, and nothing else):
+```yaml
+"""

@@ -12,6 +12,7 @@ from cover_agent.ReportGenerator import ReportGenerator
 from cover_agent.UnitTestGenerator import UnitTestGenerator
 from cover_agent.UnitTestValidator import UnitTestValidator
 from cover_agent.UnitTestDB import UnitTestDB
+from cover_agent.FailedTestAnalyzer import FailedTestAnalyzer
 
 class CoverAgent:
     def __init__(self, args):
@@ -67,6 +68,19 @@ class CoverAgent:
             num_attempts=args.run_tests_multiple_times,
             desired_mutation_score=args.desired_mutation_score,
             strict_mutation_score=args.strict_mutation_score,
+        )
+        
+        self.failed_test_analyzer = FailedTestAnalyzer(
+            source_file_path=args.source_file_path,
+            test_file_path=args.test_file_output_path,
+            llm_model=args.model,
+            code_coverage_report_path=args.code_coverage_report_path,
+            test_command=args.test_command,
+            test_command_dir=args.test_command_dir,
+            included_files=args.included_files,
+            coverage_type=args.coverage_type,
+            additional_instructions=args.additional_instructions,
+            api_base=args.api_base,
         )
 
     def parse_command_to_run_only_a_single_test(self, args):
@@ -202,6 +216,24 @@ class CoverAgent:
 
             # Check if the desired coverage has been reached
             failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.test_validator.get_coverage()
+
+            print(f"Iteration {iteration_count}: Failed test runs: {failed_test_runs}")
+
+            # If failed tests are found, analyze them
+            if failed_test_runs:
+                # failed_test_runs is already in the format needed by the analyzer
+                self.logger.info(f"Analyzing {len(failed_test_runs)} failed tests for potential source code issues")
+                relevant_tests = self.failed_test_analyzer.analyze_failed_tests(failed_test_runs)
+                
+                if relevant_tests:
+                    # Save the analysis results
+                    output_file = os.path.join(
+                        os.path.dirname(self.args.test_file_output_path),
+                        f"failed_test_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+                    )
+                    self.failed_test_analyzer.save_relevant_tests(relevant_tests, output_file)
+                    self.logger.info(f"Found {len(relevant_tests)} tests that reveal potential source code issues")
+                    self.logger.info(f"Analysis results saved to {output_file}")
             
             # Determine if we've met our goals based on strict_mutation_score setting
             coverage_goal_met = self.test_validator.current_coverage >= (self.test_validator.desired_coverage / 100)

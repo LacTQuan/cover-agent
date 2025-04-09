@@ -263,7 +263,6 @@ class UnitTestGenerator:
                 return {}
             
             # Save test behavior to a file
-            print(f'[TEST BEHAVIOR]: {tests_dict}')
             test_behaviors = tests_dict.get("new_tests", [])
             
             # Log information about generated tests
