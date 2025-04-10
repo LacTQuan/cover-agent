@@ -217,7 +217,7 @@ class CoverAgent:
             # Check if the desired coverage has been reached
             failed_test_runs, mutation_test_results, language, test_framework, coverage_report = self.test_validator.get_coverage()
 
-            print(f"Iteration {iteration_count}: Failed test runs: {failed_test_runs}")
+            # print(f"Iteration {iteration_count}: Failed test runs: {failed_test_runs}")
 
             # If failed tests are found, analyze them
             if failed_test_runs:
@@ -227,8 +227,11 @@ class CoverAgent:
                 
                 if relevant_tests:
                     # Save the analysis results
+                    output_dir = os.path.join(self.args.project_root, "potential_source_code_issues")
+                    os.makedirs(output_dir, exist_ok=True)
+
                     output_file = os.path.join(
-                        os.path.dirname(self.args.test_file_output_path),
+                        output_dir,
                         f"failed_test_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
                     )
                     self.failed_test_analyzer.save_relevant_tests(relevant_tests, output_file)

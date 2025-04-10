@@ -106,11 +106,10 @@ class FailedTestAnalyzer:
         # Call LLM for analysis
         response, _, _ = self.ai_caller.call_model(prompt=prompt)
 
-        # remove the ```yaml and ``` from the response
-        response = response.strip().split('```yaml')[1].strip()
-        response = response.split('```')[0].strip()
 
         try:
+            response = response.strip().split('```yaml')[-1].strip()
+            response = response.split('```')[0].strip()
             # Parse the YAML response
             analysis_result = yaml.safe_load(response)
             potential_issues = analysis_result.get('potential_issues', [])
